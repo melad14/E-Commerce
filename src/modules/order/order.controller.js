@@ -78,7 +78,7 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
             }
         ],
         mode: 'payment',
-        success_url: process.env.BASE_URL,
+        success_url: process.env.BASE_URL +'/order/',
         cancel_url: process.env.BASE_URL + '/cart',
         customer_email: req.user.email,
         client_reference_id: req.params.id,
@@ -118,9 +118,10 @@ export {
 }
 
 async function card(e,res) {
-    const cart = await cartModel.findById(e.client_reference_id)
-    if (!cart) return next(new AppError('cart not found', 404))
+
     let user = await userModel.findOne({ email: e.email })
+    const cart = await cartModel.findOne({user:user._id})
+    if (!cart) return next(new AppError('cart not found', 404))
 
 
     const order = new orderModel({
