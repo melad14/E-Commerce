@@ -118,9 +118,9 @@ export {
 }
 
 async function card(e,res) {
-
     let user = await userModel.findOne({ email: e.email })
-    const cart = await cartModel.findOne({user:user._id})
+    console.log('userrrr',user);
+    const cart = await cartModel.findById(user._id)
     if (!cart) return next(new AppError('cart not found', 404))
 
 
@@ -134,7 +134,7 @@ async function card(e,res) {
         paidAt: Date.now()
     })
     await order.save()
-
+console.log("orderrr",order);
     if (order) {
         let options = cart.cartItems.map(item => ({
             updateOne: {
@@ -144,7 +144,8 @@ async function card(e,res) {
             }
         }))
         await productModel.bulkWrite(options)
-        await cartModel.findOneAndDelete({ user: user._id })
+      let deletedcatr=  await cartModel.findOneAndDelete({ user: user._id })
+      console.log('deletedcatr',deletedcatr);
         return res.status(201).json({ "message": " success", order })
     }
   else{ return next(new AppError('order not found', 404))} 
