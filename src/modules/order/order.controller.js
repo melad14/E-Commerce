@@ -5,6 +5,7 @@ import { AppError } from "../../utils/AppErr.js";
 import { orderModel } from './../../../database/models/order.js';
 import Stripe from 'stripe';
 import * as dotenv from "dotenv"
+import { userModel } from './../../../database/models/user';
 dotenv.config()
 const stripe = new Stripe(process.env.STRIPE_SKRT)
 
@@ -33,10 +34,11 @@ const ctreateCashOrder = catchAsyncErr(async (req, res, next) => {
             }
         }))
         await productModel.bulkWrite(options)
-        await cartModel.findByIdAndDelete(req.params.id)
+        await cartModel.findOneAndDelete({ user: req.user._id })
+        return res.status(201).json({ "message": " success", order })
+    } else {
+        return next(new AppError('order not found', 404))
     }
-    return res.status(201).json({ "message": " success", order })
-
 })
 
 const getSpecificorders = catchAsyncErr(async (req, res, next) => {
@@ -85,10 +87,65 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
     res.status(201).json({ "message": " success", session })
 
 })
+const webhook = catchAsyncErr(async (request, response) => {
+    const sig = request.headers['stripe-signature'].toString();
+
+    let event;
+
+    try {
+        event = stripe.webhooks.constructEvent(request.body, sig, process.env.STRIPE_SG);
+    } catch (err) {
+        return response.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    if (event.type == 'checkout.session.completed') {
+        console.log('create order...');
+        const checkoutSessionCompleted = event.data.object;
+        card(event.data.object,response)
+    }
+    else {
+        console.log(`Unhandled event type ${event.type}`);
+    }
+
+    response.send();
+})
 
 export {
     ctreateCashOrder,
     getSpecificorders,
     getAllorders,
-    createCheckOut
+    createCheckOut,
+    webhook
+}
+
+async function card(e,res) {
+    const cart = await cartModel.findById(e.client_reference_id)
+    if (!cart) return next(new AppError('cart not found', 404))
+    let user = await userModel.findOne({ email: e.email })
+
+
+    const order = new orderModel({
+        user: user._id,
+        cartItems: cart.cartItems,
+        totalOrderPrice: e.amount_total / 100,
+        shippingAdress: e.metadata.shippingAdress,
+        paymentmethod: 'card',
+        isPaid: true,
+        paidAt: Date.now()
+    })
+    await order.save()
+
+    if (order) {
+        let options = cart.cartItems.map(item => ({
+            updateOne: {
+                filter: { _id: item.product },
+                update: { $inc: { quantity: -item.quantity, sold: item.quantity } }
+
+            }
+        }))
+        await productModel.bulkWrite(options)
+        await cartModel.findOneAndDelete({ user: user._id })
+        return res.status(201).json({ "message": " success", order })
+    }
+  else{ return next(new AppError('order not found', 404))} 
+
 }
