@@ -5,7 +5,7 @@ import { AppError } from "../../utils/AppErr.js";
 import { orderModel } from './../../../database/models/order.js';
 import Stripe from 'stripe';
 import * as dotenv from "dotenv"
-import { userModel } from './../../../database/models/user';
+import { userModel } from './../../../database/models/user.js';
 dotenv.config()
 const stripe = new Stripe(process.env.STRIPE_SKRT)
 
