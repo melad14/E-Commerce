@@ -87,6 +87,7 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
     res.status(201).json({ "message": " success", session })
 
 })
+
 const webhook = catchAsyncErr(async (request, response) => {
     const sig = request.headers['stripe-signature'].toString();
 
@@ -98,22 +99,22 @@ const webhook = catchAsyncErr(async (request, response) => {
         return response.status(400).send(`Webhook Error: ${err.message}`);
     }
     if (event.type == 'checkout.session.completed') {
-        const ev = event.data.object;
-        const cart = await cartModel.findById(ev.client_reference_id)
+        const cart = await cartModel.findById(event.data.object.client_reference_id)
         if (!cart) return next(new AppError('cart not found', 404))
-        let user = await userModel.findOne({ email: ev.email })
+        let user = await userModel.findOne({ email: event.data.object.email })
         if (!user) return next(new AppError('user not found', 404))
     
-        const order = new orderModel({
-            user: user._id,
-            cartItems: cart.cartItems,
-            totalOrderPrice: e.amount_total / 100,
-            shippingAdress: e.metadata.shippingAdress,
-            paymentmethod: 'card',
-            isPaid: true,
-            paidAt: Date.now()
-        })
-        await order.save()
+      
+    const order = new orderModel({
+        user: user._id,
+        cartItems: cart.cartItems,
+        totalOrderPrice:event.data.object.amount_total / 100 ,
+        shippingAdress: event.data.object.metadata.shippingAdress,
+        paymentmethod :'card',
+        isPaid:true,
+        paidAt:Date.now()
+    })
+    await order.save()
     
         if (order) {
             let options = cart.cartItems.map(item => ({
@@ -124,7 +125,7 @@ const webhook = catchAsyncErr(async (request, response) => {
                 }
             }))
             await productModel.bulkWrite(options)
-            await cartModel.findByIdAndDelete( ev.client_reference_id )
+            await cartModel.findByIdAndDelete( cart._id )
             return res.status(201).json({ "message": " success", order })
         }
         else{ return next(new AppError('order failed', 404))} 
@@ -134,7 +135,6 @@ const webhook = catchAsyncErr(async (request, response) => {
         console.log(`Unhandled event type ${event.type}`);
     }
 
-    response.send();
 })
 
 export {
