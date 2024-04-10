@@ -78,7 +78,7 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
             }
         ],
         mode: 'payment',
-        success_url: process.env.BASE_URL +'/order/',
+        success_url: process.env.BASE_URL +'/order/success',
         cancel_url: process.env.BASE_URL + '/cart',
         customer_email: req.user.email,
         client_reference_id: req.params.id,
@@ -87,7 +87,6 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
     res.status(201).json({ "message": " success", session })
 
 })
-
 const webhook = catchAsyncErr(async (request, response) => {
     const sig = request.headers['stripe-signature'].toString();
 
@@ -99,9 +98,37 @@ const webhook = catchAsyncErr(async (request, response) => {
         return response.status(400).send(`Webhook Error: ${err.message}`);
     }
     if (event.type == 'checkout.session.completed') {
-        console.log('create order...');
-        const checkoutSessionCompleted = event.data.object;
-        card(event.data.object,response)
+        const ev = event.data.object;
+        const cart = await cartModel.findById(ev.client_reference_id)
+        if (!cart) return next(new AppError('cart not found', 404))
+        let user = await userModel.findOne({ email: ev.email })
+        if (!user) return next(new AppError('user not found', 404))
+    
+        const order = new orderModel({
+            user: user._id,
+            cartItems: cart.cartItems,
+            totalOrderPrice: e.amount_total / 100,
+            shippingAdress: e.metadata.shippingAdress,
+            paymentmethod: 'card',
+            isPaid: true,
+            paidAt: Date.now()
+        })
+        await order.save()
+    
+        if (order) {
+            let options = cart.cartItems.map(item => ({
+                updateOne: {
+                    filter: { _id: item.product },
+                    update: { $inc: { quantity: -item.quantity, sold: item.quantity } }
+    
+                }
+            }))
+            await productModel.bulkWrite(options)
+            await cartModel.findByIdAndDelete( ev.client_reference_id )
+            return res.status(201).json({ "message": " success", order })
+        }
+        else{ return next(new AppError('order failed', 404))} 
+
     }
     else {
         console.log(`Unhandled event type ${event.type}`);
@@ -118,37 +145,8 @@ export {
     webhook
 }
 
-async function card(e,res) {
-    let user = await userModel.findOne({ email: e.email })
-    console.log('userrrr',user);
-    const cart = await cartModel.findById(user._id)
-    if (!cart) return next(new AppError('cart not found', 404))
+// async function card(e,res) {
+   
+//   else{ return next(new AppError('order not found', 404))} 
 
-
-    const order = new orderModel({
-        user: user._id,
-        cartItems: cart.cartItems,
-        totalOrderPrice: e.amount_total / 100,
-        shippingAdress: e.metadata.shippingAdress,
-        paymentmethod: 'card',
-        isPaid: true,
-        paidAt: Date.now()
-    })
-    await order.save()
-console.log("orderrr",order);
-    if (order) {
-        let options = cart.cartItems.map(item => ({
-            updateOne: {
-                filter: { _id: item.product },
-                update: { $inc: { quantity: -item.quantity, sold: item.quantity } }
-
-            }
-        }))
-        await productModel.bulkWrite(options)
-      let deletedcatr=  await cartModel.findOneAndDelete({ user: user._id })
-      console.log('deletedcatr',deletedcatr);
-        return res.status(201).json({ "message": " success", order })
-    }
-  else{ return next(new AppError('order not found', 404))} 
-
-}
+// }
