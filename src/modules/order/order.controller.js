@@ -88,15 +88,15 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
 
 })
 
-const webhook = catchAsyncErr(async (request, response) => {
-    const sig = request.headers['stripe-signature'].toString();
+const webhook = catchAsyncErr(async (req, res,next) => {
+    const sig = req.headers['stripe-signature'].toString();
 
     let event;
 
     try {
-        event = stripe.webhooks.constructEvent(request.body, sig, process.env.STRIPE_SG);
+        event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_SG);
     } catch (err) {
-        return response.status(400).send(`Webhook Error: ${err.message}`);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
     }
     if (event.type == 'checkout.session.completed') {
         const cart = await cartModel.findById(event.data.object.client_reference_id)
