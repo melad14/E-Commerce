@@ -101,12 +101,11 @@ const webhook = catchAsyncErr(async (req, res,next) => {
     if (event.type == 'checkout.session.completed') {
         const cart = await cartModel.findById(event.data.object.client_reference_id)
         if (!cart) return next(new AppError('cart not found', 404))
-        let user = await userModel.findOne({ email: event.data.object.email })
-        if (!user) return next(new AppError('user not found', 404))
+  
     
       
     const order = new orderModel({
-        user: user._id,
+        user: req.user._id,
         cartItems: cart.cartItems,
         totalOrderPrice:event.data.object.amount_total / 100 ,
         shippingAdress: event.data.object.metadata.shippingAdress,
