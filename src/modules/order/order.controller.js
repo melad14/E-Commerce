@@ -78,8 +78,8 @@ const createCheckOut = catchAsyncErr(async (req, res, next) => {
             }
         ],
         mode: 'payment',
-        success_url: process.env.BASE_URL +'/order/success',
-        cancel_url: process.env.BASE_URL + '/cart',
+        success_url: process.env.BASE_URL +'order/success',
+        cancel_url: process.env.BASE_URL + 'cart',
         customer_email: req.user.email,
         client_reference_id: req.params.id,
         metadata: req.body.shippingAdress
@@ -101,11 +101,13 @@ const webhook = catchAsyncErr(async (req, res,next) => {
     if (event.type == 'checkout.session.completed') {
         const cart = await cartModel.findById(event.data.object.client_reference_id)
         if (!cart) return next(new AppError('cart not found', 404))
+        const user = await userModel.findOne(event.data.object.customer_email)
+        if (!user) return next(new AppError('user not found', 404))
   
     
       
     const order = new orderModel({
-        user: req.user._id,
+        user: user._id,
         cartItems: cart.cartItems,
         totalOrderPrice:event.data.object.amount_total / 100 ,
         shippingAdress: event.data.object.metadata.shippingAdress,
