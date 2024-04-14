@@ -5,11 +5,12 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    
   
   },
   "engines": {
-    "node": ">=14"  },
+    "node": "20.11.0"  },
   "keywords": [],
   "author": "",
   "license": "ISC",
