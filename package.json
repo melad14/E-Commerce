@@ -5,10 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start"
-    
+    "start": "node server.js"
   },
   "engines": {
     "node": "20.11.0"
